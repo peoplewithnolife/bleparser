@@ -56,18 +56,22 @@ def openfile(fname):
     return fo
 
 def gotARecord(r):
+    #print(dumpRec(r,showPayload))
     if r.msgFormat == 'H':
          txBgrecs.append(r)
     else:
          rxBgrecs.append(r)        
 
-def dumpRecs(rV):
-    global showPayload
-    for r in rV:
-        #r.dump()
+def dumpRec(r,p):
         rStr = "%09.5f %s <%02X %03d %02X %02X> " % (r.msgTimeStamp, r.msgFormat, r.msgType, r.msgPayloadLen, r.msgClass, r.msgMethod)
         if showPayload == True:
             rStr += str(binascii.hexlify(r.msgPayload,'-'))
+        return rStr
+
+def dumpRecs(rV):
+    global showPayload
+    for r in rV:
+        rStr = dumpRec(r,showPayload)
         print(rStr)
         if r.msgType != 0 and r.msgType != 128:
             print("Bad message type")
@@ -102,7 +106,7 @@ def mergeRecs():
 def parsefile(fo,ld):
     global linesParsed
     for line in fo:
-        # print(line)
+        #print(line, end='')
         ### get the float and the NxXX out of a string like this
         ### 0.025667000000000,'255' (0xFF),,
         ### But ignore a string like this

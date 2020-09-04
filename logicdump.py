@@ -49,8 +49,13 @@ class LogicDump:
                 self.bgRec.msgMethod = datum
             self.headCount += 1
             if self.headCount >= 4:
-                self.payloadCount = 0
-                self.status = "payload"
+                if self.bgRec.msgPayloadLen != 0:
+                    self.payloadCount = 0
+                    self.status = "payload"
+                else:
+                    # no payload to get just reset the state
+                    recCb(self.bgRec)
+                    self.resetState() 
             if self.headCount == 1:
                 # Check for error
                 if self.bgRec.msgType != 0 and self.bgRec.msgType != 128:
