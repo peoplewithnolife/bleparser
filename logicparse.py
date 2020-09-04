@@ -22,16 +22,19 @@ SerExam_Pass_TX_to_Module.csv
 ### rxfname = "logicfiles/SerExam_Pass_RX_from_Module.csv"
 ### rxfname = "logicfiles/Kdex_Pass_RX_from_Module.csv"
 rxfname = "SerRx.csv"
+### rxfname = "ShortRx.txt"
 
 ###txfname = "ftx.txt"
 ###txfname = "logicfiles/Kdex_Pass_TX_to_Module.csv"
 txfname = "SerTx.csv"
+###txfname = "ShortTx.txt"
 
 linesParsed = 0
 showPayload = False
 
 rxBgrecs = []
 txBgrecs = []
+txrxBgRecs = []
 
 # class LogicDump:
 #     def __init__(self, handshake):
@@ -70,6 +73,31 @@ def dumpRecs(rV):
             print("Bad message type")
             exit()
 
+def mergeRecs():
+    txCnt = 0
+    rxCnt = 0
+    txrxCnt = 0
+    txLen = len(txBgrecs)
+    rxLen = len(rxBgrecs)
+    print("%d %d" % (txLen,rxLen))
+    while txCnt < txLen or rxCnt < rxLen:
+        if rxCnt >= rxLen:
+            #txrxRecs[txrxCnt] = txBgrecs[txCnt]
+            txrxBgRecs.append(txBgrecs[txCnt])
+            txCnt += 1
+        elif txCnt >= txLen:
+            #txrxRecs[txrxCnt] = rxBgrecs[rxCnt]
+            txrxBgRecs.append(rxBgrecs[rxCnt])
+            rxCnt += 1
+        elif txBgrecs[txCnt].msgTimeStamp < rxBgrecs[rxCnt].msgTimeStamp:
+            #txrxRecs[txrxCnt] = txBgrecs[txCnt]
+            txrxBgRecs.append(txBgrecs[txCnt])
+            txCnt += 1
+        else:
+            #txrxRecs[txrxCnt] = rxBgrecs[rxCnt]
+            txrxBgRecs.append(rxBgrecs[rxCnt])
+            rxCnt += 1
+        txrxCnt += 1
 
 def parsefile(fo,ld):
     global linesParsed
@@ -127,10 +155,15 @@ def main():
     frx.close()
     ftx.close()
 
-    dumpRecs(rxBgrecs)
-    dumpRecs(txBgrecs)
+    #dumpRecs(rxBgrecs)
+    #dumpRecs(txBgrecs)
+    mergeRecs()
+
+    dumpRecs(txrxBgRecs)
+
     print("RxbufLen:%d" % (len(rxBgrecs)))
     print("TxbufLen:%d" % (len(txBgrecs)))
+    print("RxTxbufLen:%d" % (len(txrxBgRecs)))
 
     print("End Program")
 
