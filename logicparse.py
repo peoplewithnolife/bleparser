@@ -1,4 +1,5 @@
 from logicdump import *
+from logicDigiApi import *
 import binascii
 import sys
 
