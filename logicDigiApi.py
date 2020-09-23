@@ -1,3 +1,5 @@
+### Warning this might be useless
+
 class DigiApiRecord:
     def __init__(self):
         self.msgTimeStamp = 0.0

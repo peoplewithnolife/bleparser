@@ -18,17 +18,28 @@ SerExam_Pass_RX_from_Module.csv
 SerExam_Pass_TX_to_Module.csv
 """
 
+#### Some K5 Bg Files
+#dumptype = "BlueGiga"
 # rxfname = "frx.txt"
 ###rxfname = "logicfiles/SerExam_END_Pass_RX_from_Module.csv"
 ### rxfname = "logicfiles/SerExam_Pass_RX_from_Module.csv"
 ### rxfname = "logicfiles/Kdex_Pass_RX_from_Module.csv"
-rxfname = "SerRx.csv"
-### rxfname = "ShortRx.txt"
+#rxfname = "SerRx.csv"
+#rxfname = "ShortRx.txt"
 
 ###txfname = "ftx.txt"
 ###txfname = "logicfiles/Kdex_Pass_TX_to_Module.csv"
-txfname = "SerTx.csv"
-###txfname = "ShortTx.txt"
+# txfname = "SerTx.csv"
+#txfname = "ShortTx.txt"
+
+### Some Digi XB files
+dumptype = "DigiXb"
+#txfname = "NormalTx.csv"
+#rxfname = "NormalRx.csv"
+txfname = "Mk4LogicCapt/TxFailuresTX.csv"
+rxfname = "Mk4LogicCapt/TxFailuresRX.csv"
+### txfname = "ShortDigiTx.csv"
+### rxfname = "ShortDigiRx.csv"
 
 linesParsed = 0
 showPayload = False
@@ -64,7 +75,9 @@ def gotARecord(r):
          rxBgrecs.append(r)        
 
 def dumpRec(r,p):
-        rStr = "%09.5f %s <%02X %03d %02X %02X> " % (r.msgTimeStamp, r.msgFormat, r.msgType, r.msgPayloadLen, r.msgClass, r.msgMethod)
+        rStr = "%09.5f %s <%02X %03d %02X %02X> %s" % (r.msgTimeStamp, r.msgFormat, r.msgType, r.msgPayloadLen, r.msgClass, r.msgMethod, r.message)
+        if dumptype == "DigiXb":
+            rStr += dumpDigiXPFrame(r)
         if showPayload == True:
             rStr += str(binascii.hexlify(r.msgPayload,'-'))
         return rStr
@@ -74,9 +87,10 @@ def dumpRecs(rV):
     for r in rV:
         rStr = dumpRec(r,showPayload)
         print(rStr)
-        if r.msgType != 0 and r.msgType != 128:
-            print("Bad message type")
-            exit()
+        if dumptype == "BlueGiga":
+            if r.msgType != 0 and r.msgType != 128:
+                print("Bad message type")
+                exit()
 
 def mergeRecs():
     txCnt = 0
@@ -145,8 +159,8 @@ def main():
     frx = openfile(rxfname)
     ftx = openfile(txfname)
 
-    ldRx = LogicDump(False)    
-    ldTx = LogicDump(True)
+    ldRx = LogicDump(False,dumptype)    
+    ldTx = LogicDump(True,dumptype)
 
     print("Parsing Rx...")
     parsefile(frx,ldRx)

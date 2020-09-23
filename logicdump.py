@@ -7,14 +7,16 @@ class BgRecord:
         self.msgClass = 0
         self.msgMethod = 0
         self.msgPayload = bytearray(b'')
+        self.message = ""
 
     def dump(self):
         print("**********************Phil Sux********************")
 
 class LogicDump:
-    def __init__(self, handshake):
+    def __init__(self, handshake, dumptype = "BlueGiga"):
         self.handshake = handshake
         self.resetState()
+        self.dumptype = dumptype
 
     def resetState(self):
         self.bgRec = BgRecord()
@@ -31,6 +33,71 @@ class LogicDump:
         self.payloadLen = 0
 
     def add(self, timestamp, datum, recCb):
+        if self.dumptype == "BlueGiga":
+            self.addBlueGiga(timestamp, datum, recCb)
+        elif self.dumptype == "DigiXb":
+            self.addDigiXb(timestamp, datum, recCb)
+        else:
+            print("Bad Dump Type")
+
+    # Digi xb parser
+    """
+269.746977000000015,~ (0x7E),,    Start Delimiter
+269.747063500000024,'0' (0x00),,  Length MSB
+269.747149999999976,'5' (0x05),,  Length LSB (5)
+269.747236999999984,'8' (0x08),,  FRM Type 0
+269.747323499999993,'255' (0xFF),,FRM ID   1
+269.747410000000002,A (0x41),,             2
+269.747497000000010,M (0x4D),,             3
+269.747583500000019,'0' (0x00),,           4
+269.747670000000028,j (0x6A),,     SUM     
+
+270.747484499999985,~ (0x7E),,
+270.747571499999992,'0' (0x00),,
+270.747658000000001,'4' (0x04),,
+270.747744500000010,'8' (0x08),,
+270.747831500000018,'0' (0x00),,
+270.747918000000027,A (0x41),,
+270.748004499999979,I (0x49),,
+270.748091499999987,m (0x6D),,
+"""
+    def addDigiXb(self, timestamp, datum, recCb):
+        resetSt = False
+        if self.status == "handshake":
+            self.status = "head"
+        if self.status == "head":
+            if self.headCount == 0:
+                self.bgRec.msgTimeStamp = timestamp
+                if datum != 0x7E:
+                    print("Message frame error!!!")
+                    self.bgRec.message = "Error"
+                    recCb(self.bgRec)
+                    resetSt = True
+                    #self.resetState()
+            elif self.headCount == 1:
+                self.payloadLen = datum * 256
+            elif self.headCount == 2:
+                self.payloadLen += datum
+                self.bgRec.msgPayloadLen = self.payloadLen
+                self.status = "payload"
+            self.headCount += 1
+        elif self.status == "payload":
+            self.bgRec.msgPayload.append(datum)
+            if self.payloadCount == 0:
+                self.bgRec.msgType = datum
+            self.payloadCount += 1
+            if self.payloadCount >= self.payloadLen:
+                self.status = "checksum"
+        elif self.status == "checksum":
+            self.bgRec.msgPayload.append(datum)
+            recCb(self.bgRec)
+            resetSt = True
+            #self.resetState()
+        if resetSt:
+            self.resetState()
+
+    # Blue giga parser
+    def addBlueGiga(self, timestamp, datum, recCb):
         if self.status == "handshake":
             self.frmCount = 0
             self.frmLen = datum
@@ -168,3 +235,79 @@ Handshake
 33.902794000000000,'3' (0x03),,  FRM 8   PL 4
 
 """
+digiXpAPIFrames = {
+    0x08: "AT   ",
+    0x88: "ATRSP",
+    0x8A: "MODEM",
+    0x20: "TX   ",
+    0xB0: "RX   "
+}
+
+digiModemStatus = {
+    0x00: "Reset",
+    0x01: "Watchdog",
+    0x02: "On Network",
+    0x03: "Off Network",
+    0x0E: "Remote Mgr Connect",
+    0x0F: "Remote Mgr Disconnect",
+    0x32: "BLE Connect",
+    0x33: "BLE Disconnect",
+    0x34: "Bandmask something or other",
+    0x35: "Cell Update Start",
+    0x36: "Cell Update Fail",
+    0x37: "Cell Update Complete",
+    0x38: "XB Update Start",
+    0x39: "XB Update Fail",
+    0x3A: "XB Update Applying" 
+}
+
+def dumpDigiXPFrame(msg):
+    if len(msg.msgPayload) == 0:
+        return "-----"
+    if msg.msgPayload[0] in digiXpAPIFrames:
+        ret = digiXpAPIFrames[msg.msgPayload[0]]
+        if msg.msgPayload[0] == 0x08:
+            ret += " "
+            ret += showATCmd(msg.msgPayload)
+        if msg.msgPayload[0] == 0x88:
+            ret += " "
+            ret += showATCmdRsp(msg.msgPayload)
+        if msg.msgPayload[0] == 0x8A:
+            ret += " "
+            ret += showModemStatus(msg.msgPayload)
+        return ret
+    return "?????"
+
+def showModemStatus(msgPl):
+    modemStr = "Unknown Modem Status :("
+    if msgPl[1] in digiModemStatus:
+        modemStr = digiModemStatus[msgPl[1]]
+    return modemStr
+
+def showATCmdRsp(msgPl):
+    atStr = "??"
+    if len(msgPl) < 5:
+        return atStr
+    atStr = "%c" % (msgPl[2])
+    atStr += "%c" % (msgPl[3])
+    if atStr == "LA":
+        for i in range (4,len(msgPl)-1):
+            atStr += "%d." % (msgPl[i])        
+    else: 
+        for i in range (4,len(msgPl)-1):
+            atStr += "-%02X" % (msgPl[i])
+    return atStr
+
+def showATCmd(msgPl):
+    atStr = "??"
+    if len(msgPl) < 5:
+        return atStr
+    atStr = "%c" % (msgPl[2])
+    atStr += "%c" % (msgPl[3])
+    if atStr == "LA":
+        for i in range (4,len(msgPl)-1):
+            atStr += "%c" % (msgPl[i])        
+    else: 
+        for i in range (4,len(msgPl)-1):
+            atStr += "%02X" % (msgPl[i])
+    return atStr
